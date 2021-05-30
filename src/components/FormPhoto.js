@@ -15,7 +15,10 @@ const FormPhoto = (props) => {
   const fileUploadRef = useRef();
 
   //set formEdit
-  useEffect(() => {}, [props.formEdit]);
+  useEffect(() => {
+    // เปลี่ยนค่าฟอร์มตาม photocard ที่ click เข้ามา
+    setFormPhoto({ ...props.formEdit[0] });
+  }, [props.formEdit]);
 
   //validate
   useEffect(() => {

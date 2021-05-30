@@ -3,22 +3,35 @@ import { confirmDialog } from "primereact/confirmdialog";
 import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
 import { Toast } from "primereact/toast";
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import Loader from "react-loader-spinner";
 import FormPhoto from "./FormPhoto";
 import httpClient from "../services/http-common";
+import PhotoCard from "./PhotoCard";
+import { debounce } from "lodash";
 
 const Photos = () => {
-  //ข้อมูลทั้งหมด
+  // ข้อมูลทั้งหมด
   const [photos, setPhotos] = useState([]);
-  //Binding กับ dialog
+  // Binding กับ dialog
   const [isShowDialog, setIsShowDialog] = useState(false);
-  //โหมด add and edit
+  // โหมด add and edit
   const [mode, setMode] = useState("Add");
-  //รอโหลด request จาก api
+  // รอโหลด request จาก api
   const [loading, setLoading] = useState(false);
-  //reference ถึง toast ในหน้าจอเรานะ
+  // reference ถึง toast ในหน้าจอเรานะ
   const toast = useRef(null);
+  // form state
+  const [formPhoto, setFormPhoto] = useState({
+    title: "",
+    description: "",
+    photos: [],
+  });
+
+  // คิวรี่ข้อมูลตอนแรกสุด
+  useEffect(() => {
+    GetAllPhoto();
+  }, []);
 
   //แสดงแจ้งเตือน
   const showAlert = (message, status, detail) => {
@@ -36,17 +49,58 @@ const Photos = () => {
       message: "Are you sure you want to proceed?",
       header: "Confirmation",
       icon: "pi pi-exclamation-triangle",
-      accept: () => {},
+      accept: () => {
+        DeletePhoto(id);
+      },
     });
+  };
+
+  //ลบข้อมูล
+  const DeletePhoto = async (id) => {
+    try {
+      const request = await httpClient.delete("/photos/" + id);
+      const response = await request;
+      if (response.status === 200) {
+        showAlert("Success", "success", "Delete Success");
+        setIsShowDialog(false);
+        GetAllPhoto();
+      }
+    } catch (error) {
+      showAlert("Failed", "error", error.message);
+    }
+  };
+
+  const EditPhotoClick = async (id) => {
+    setMode("Edit");
+    try {
+      const request = await httpClient.get("photos/" + id);
+      const response = await request;
+      if (response.status === 200) {
+        setIsShowDialog(true);
+        setFormPhoto(response.data);
+        console.log(response.data);
+      }
+    } catch (error) {
+      showAlert("Error", "error", error.message);
+    }
   };
 
   // ตัวแปรสร้าง photoCard
   const listPhoto =
     photos &&
     photos.map((photoItems) => {
-      return <div key={photoItems.id} className="p-col-12 p-md-6 p-lg-4"></div>;
+      return (
+        <div key={photoItems.id} className="p-col-12 p-md-6 p-lg-4">
+          <PhotoCard
+            onDeleteClick={confirmDelete}
+            onEditClick={EditPhotoClick}
+            photo={photoItems}
+          />
+        </div>
+      );
     });
 
+  //กดปุ่ม save จากหน้า form
   const SubmitPhoto = (formPhoto) => {
     switch (mode) {
       case "Add":
@@ -89,7 +143,38 @@ const Photos = () => {
     }
   };
 
-  const EditPhoto = async (formPhoto) => {};
+  const EditPhoto = async (formPhoto) => {
+    try {
+      const request = await httpClient.put(
+        `/photos/${formPhoto.id}`,
+        formPhoto
+      );
+      const response = await request;
+      if (response.status === 200) {
+        showAlert("Success", "success", "Insert Success");
+        setIsShowDialog(false);
+        GetAllPhoto();
+      }
+    } catch (error) {
+      showAlert("Failed", "error", error.message);
+    }
+  };
+
+  //ค้นหาข้อมูล
+  const SearchPhoto = debounce(async (e) => {
+    try {
+      const request = await httpClient.get(
+        "/photos?searchText=" + e.target.value
+      );
+      const response = await request;
+      if (response.status === 200) {
+        console.log(response.data);
+        setPhotos(response.data);
+      }
+    } catch (error) {
+      showAlert("Failed", "error", error.message);
+    }
+  }, 500);
 
   //dialog โชว์ฟอร์ม
   const dialog = (
@@ -99,11 +184,12 @@ const Photos = () => {
       blockScroll={true}
       style={{ width: 1000 }}
       onHide={() => {
+        setFormPhoto({});
         setIsShowDialog(false);
       }}
     >
       <div className="p-grid">
-        <FormPhoto onSaveClick={SubmitPhoto} />
+        <FormPhoto formEdit={formPhoto} onSaveClick={SubmitPhoto} />
       </div>
     </Dialog>
   );
@@ -113,6 +199,9 @@ const Photos = () => {
       <InputText
         placeholder="Search"
         className="width-full-grid search-input"
+        onChange={(e) => {
+          SearchPhoto(e);
+        }}
       />
 
       {listPhoto}
