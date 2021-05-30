@@ -6,12 +6,18 @@ import { Toast } from "primereact/toast";
 import React, { useRef, useState } from "react";
 import Loader from "react-loader-spinner";
 import FormPhoto from "./FormPhoto";
+import httpClient from "../services/http-common";
 
 const Photos = () => {
+  //ข้อมูลทั้งหมด
   const [photos, setPhotos] = useState([]);
+  //Binding กับ dialog
   const [isShowDialog, setIsShowDialog] = useState(false);
+  //โหมด add and edit
   const [mode, setMode] = useState("Add");
+  //รอโหลด request จาก api
   const [loading, setLoading] = useState(false);
+  //reference ถึง toast ในหน้าจอเรานะ
   const toast = useRef(null);
 
   //แสดงแจ้งเตือน
@@ -34,12 +40,58 @@ const Photos = () => {
     });
   };
 
+  // ตัวแปรสร้าง photoCard
   const listPhoto =
     photos &&
     photos.map((photoItems) => {
       return <div key={photoItems.id} className="p-col-12 p-md-6 p-lg-4"></div>;
     });
 
+  const SubmitPhoto = (formPhoto) => {
+    switch (mode) {
+      case "Add":
+        AddPhoto(formPhoto);
+        break;
+      case "Edit":
+        EditPhoto(formPhoto);
+        break;
+      default:
+        break;
+    }
+  };
+
+  //คิวรี่ข้อมูลครับ
+  const GetAllPhoto = async () => {
+    try {
+      const request = await httpClient.get("/photos");
+      const response = await request;
+      if (response.status === 200) {
+        console.log(response.data);
+        setPhotos(response.data);
+      }
+    } catch (error) {
+      showAlert("Failed", "error", error.message);
+    }
+  };
+
+  //เพิ่มข้อมูลครับ
+  const AddPhoto = async (formPhoto) => {
+    try {
+      const request = await httpClient.post("/photos", formPhoto);
+      const response = await request;
+      if (response.status === 201) {
+        showAlert("Success", "success", "Insert Success");
+        setIsShowDialog(false);
+        GetAllPhoto();
+      }
+    } catch (error) {
+      showAlert("Failed", "error", error.message);
+    }
+  };
+
+  const EditPhoto = async (formPhoto) => {};
+
+  //dialog โชว์ฟอร์ม
   const dialog = (
     <Dialog
       header={`${mode} Photo`}
@@ -51,7 +103,7 @@ const Photos = () => {
       }}
     >
       <div className="p-grid">
-        <FormPhoto />
+        <FormPhoto onSaveClick={SubmitPhoto} />
       </div>
     </Dialog>
   );
@@ -62,6 +114,7 @@ const Photos = () => {
         placeholder="Search"
         className="width-full-grid search-input"
       />
+
       {listPhoto}
 
       {dialog}
@@ -69,7 +122,10 @@ const Photos = () => {
       <Toast ref={toast} position="bottom-right" />
 
       <Button
-        onClick={() => setIsShowDialog(true)}
+        onClick={() => {
+          setMode("Add");
+          setIsShowDialog(true);
+        }}
         label="Add"
         icon="pi pi-plus"
         className="btn-add-photo"
